@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ニック式英語">
+<meta name="theme-color" content="#1D9E75">
+<link rel="manifest" href="manifest.json">
+<title>ニック式 英語フラッシュカード</title>
+<style>
+  :root {
+    --green: #1D9E75;
+    --green-light: #E1F5EE;
+    --green-dark: #0F6E56;
+    --red: #E24B4A;
+    --red-light: #FCEBEB;
+    --gray: #888780;
+    --gray-light: #F1EFE8;
+    --text: #2C2C2A;
+    --text-sub: #5F5E5A;
+    --text-hint: #888780;
+    --border: rgba(0,0,0,0.12);
+    --bg: #ffffff;
+    --bg-secondary: #F8F7F4;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text: #F1EFE8;
+      --text-sub: #B4B2A9;
+      --text-hint: #888780;
+      --border: rgba(255,255,255,0.15);
+      --bg: #1a1a18;
+      --bg-secondary: #232320;
+      --gray-light: #2C2C2A;
+      --green-light: #0a3326;
+      --red-light: #2a1212;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    background: var(--bg-secondary); color: var(--text);
+    min-height: 100vh; min-height: -webkit-fill-available;
+    display: flex; flex-direction: column;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+  }
+
+  /* ヘッダー */
+  .header {
+    background: var(--bg); border-bottom: 0.5px solid var(--border);
+    padding: 12px 16px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  }
+  .header-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .header-stats { display: flex; gap: 12px; font-size: 13px; font-weight: 500; }
+  .stat-ok { color: var(--green); }
+  .stat-ng { color: var(--red); }
+
+  /* プログレス */
+  .progress-wrap { padding: 10px 16px 0; background: var(--bg); }
+  .progress-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-hint); margin-bottom: 6px; }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 99px; }
+  .progress-fill { height: 3px; background: var(--green); border-radius: 99px; transition: width 0.4s ease; }
+
+  /* メインエリア */
+  .main { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* カード */
+  .card-wrap { perspective: 1200px; }
+  .card-inner {
+    position: relative; transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
+    cursor: pointer;
+  }
+  .card-inner.flipped { transform: rotateY(180deg); }
+  .card-face {
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    background: var(--bg); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 24px 20px;
+  }
+  .card-back {
+    position: absolute; top: 0; left: 0; width: 100%;
+    transform: rotateY(180deg); overflow-y: auto;
+    max-height: 60vh;
+  }
+
+  /* カード表 */
+  .situation-badge {
+    display: inline-block; font-size: 11px; padding: 3px 10px;
+    border-radius: 99px; background: var(--green-light);
+    color: var(--green-dark); font-weight: 500; margin-bottom: 16px;
+  }
+  .card-ja { font-size: 22px; font-weight: 600; color: var(--text); line-height: 1.5; text-align: center; margin-bottom: 12px; }
+  .card-tap-hint { font-size: 12px; color: var(--text-hint); text-align: center; margin-top: 16px; padding-top: 16px; border-top: 0.5px solid var(--border); }
+
+  /* カード裏 */
+  .card-en-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+  .card-en { font-size: 20px; font-weight: 700; color: var(--green); text-align: center; line-height: 1.4; }
+  .btn-speak { background: none; border: 0.5px solid var(--border); border-radius: 99px; padding: 5px 10px; cursor: pointer; color: var(--text-sub); font-size: 13px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+  .btn-speak:active { background: var(--gray-light); }
+  .meaning { font-size: 13px; color: var(--text-sub); line-height: 1.7; padding: 10px 0; border-top: 0.5px solid var(--border); }
+  .examples-title { font-size: 11px; font-weight: 600; color: var(--text-hint); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 12px; margin-bottom: 8px; }
+  .example-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 0.5px solid var(--border); }
+  .example-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .example-text { font-size: 13px; color: var(--text); line-height: 1.6; flex: 1; }
+  .btn-speak-sm { background: none; border: none; cursor: pointer; color: var(--text-hint); font-size: 15px; padding: 2px; flex-shrink: 0; margin-top: 1px; }
+  .next-badge { font-size: 11px; color: var(--text-hint); text-align: center; margin-top: 12px; padding-top: 12px; border-top: 0.5px solid var(--border); }
+
+  /* ボタン */
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-answer { padding: 14px; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; cursor: pointer; border: none; transition: transform 0.1s, opacity 0.1s; }
+  .btn-answer:active { transform: scale(0.97); }
+  .btn-answer:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-ng { background: var(--red-light); color: var(--red); }
+  .btn-ok { background: var(--green-light); color: var(--green-dark); }
+
+  /* ナビゲーション */
+  .nav-row { display: flex; gap: 8px; }
+  .btn-nav { flex: 1; padding: 10px; border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; border: 0.5px solid var(--border); background: var(--bg); color: var(--text-sub); }
+  .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* フィルター */
+  .filter-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .btn-filter { flex-shrink: 0; padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 500; cursor: pointer; border: 0.5px solid var(--border); background: var(--bg); color: var(--text-sub); white-space: nowrap; }
+  .btn-filter.active { background: var(--green); color: white; border-color: var(--green); }
+
+  /* 完了画面 */
+  .finish-screen { text-align: center; padding: 3rem 1rem; }
+  .finish-icon { font-size: 56px; margin-bottom: 16px; }
+  .finish-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .finish-pct { font-size: 48px; font-weight: 700; color: var(--green); margin-bottom: 4px; }
+  .finish-sub { font-size: 14px; color: var(--text-sub); margin-bottom: 24px; }
+  .score-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+  .score-card { background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 8px; }
+  .score-num { font-size: 24px; font-weight: 700; }
+  .score-label { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+  .btn-restart { width: 100%; padding: 15px; background: var(--green); color: white; border: none; border-radius: var(--radius-sm); font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+  .btn-restart:active { background: var(--green-dark); }
+  .btn-review { width: 100%; padding: 15px; background: var(--bg); color: var(--red); border: 0.5px solid var(--red); border-radius: var(--radius-sm); font-size: 16px; font-weight: 600; cursor: pointer; }
+
+  /* ローディング */
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 2rem; gap: 16px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--text-sub); }
+
+  /* エラー画面 */
+  .error-screen { text-align: center; padding: 3rem 1rem; }
+  .error-icon { font-size: 48px; margin-bottom: 16px; }
+  .error-msg { font-size: 14px; color: var(--text-sub); line-height: 1.7; margin-bottom: 24px; }
+  .btn-retry { padding: 14px 32px; background: var(--green); color: white; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; cursor: pointer; }
+
+  /* オフラインバナー */
+  .offline-banner { background: #F59E0B; color: white; text-align: center; font-size: 12px; padding: 6px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">📚 ニック式 フラッシュカード</div>
+  <div class="header-stats">
+    <span class="stat-ok" id="hdr-ok">✓ 0</span>
+    <span class="stat-ng" id="hdr-ng">✗ 0</span>
+  </div>
+</div>
+
+<div id="offline-banner" class="offline-banner" style="display:none;">
+  📴 オフラインモード（前回のデータを使用中）
+</div>
+
+<div id="root">
+  <div class="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">フレーズを読み込み中...</div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// データ読み込み（外部JSONフェッチ）
+// ============================================================
+let ALL_PHRASES = [];
+
+async function loadPhrases() {
+  try {
+    const res = await fetch('phrases.json?t=' + Date.now(), { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    ALL_PHRASES = await res.json();
+    return true;
+  } catch (e) {
+    // オフライン時はService Workerキャッシュから取得を試みる
+    try {
+      const res = await fetch('phrases.json');
+      if (!res.ok) throw new Error('cache miss');
+      ALL_PHRASES = await res.json();
+      document.getElementById('offline-banner').style.display = 'block';
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
+
+// ============================================================
+// SRS (SM-2 簡易版)
+// ============================================================
+const SRS_KEY = "nic_srs_v1";
+
+function loadSRS() {
+  try { return JSON.parse(localStorage.getItem(SRS_KEY) || "{}"); }
+  catch(e) { return {}; }
+}
+
+function saveSRS(srs) {
+  localStorage.setItem(SRS_KEY, JSON.stringify(srs));
+}
+
+function getDueCards(phrases, filterMode) {
+  const srs = loadSRS();
+  const today = todayStr();
+  let pool = phrases;
+
+  if (filterMode === "due") {
+    pool = phrases.filter(p => {
+      const r = srs[p.url];
+      if (!r) return true;
+      return r.next_date <= today;
+    });
+  } else if (filterMode === "weak") {
+    pool = phrases.filter(p => {
+      const r = srs[p.url];
+      return r && r.lapses > 0;
+    });
+  }
+
+  pool.sort((a, b) => {
+    const ra = srs[a.url];
+    const rb = srs[b.url];
+    if (!ra && !rb) return 0;
+    if (!ra) return -1;
+    if (!rb) return 1;
+    return ra.next_date.localeCompare(rb.next_date);
+  });
+
+  return pool;
+}
+
+function updateSRS(url, correct) {
+  const srs = loadSRS();
+  const today = todayStr();
+  let r = srs[url] || { interval: 0, ease: 2.5, lapses: 0, reps: 0, next_date: today };
+
+  if (correct) {
+    r.reps++;
+    if (r.interval === 0) r.interval = 1;
+    else if (r.interval === 1) r.interval = 3;
+    else r.interval = Math.round(r.interval * r.ease);
+    r.ease = Math.min(2.5, r.ease + 0.1);
+  } else {
+    r.lapses++;
+    r.interval = 1;
+    r.ease = Math.max(1.3, r.ease - 0.2);
+  }
+
+  r.next_date = addDays(today, r.interval);
+  srs[url] = r;
+  saveSRS(srs);
+  return r;
+}
+
+function getNextDateLabel(url) {
+  const srs = loadSRS();
+  const r = srs[url];
+  if (!r) return "初めて";
+  if (r.interval <= 1) return "明日";
+  if (r.interval <= 7) return r.interval + "日後";
+  return Math.round(r.interval / 7) + "週間後";
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDays(dateStr, days) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// ============================================================
+// 音声読み上げ
+// ============================================================
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-US";
+  u.rate = 0.9;
+  u.pitch = 1.0;
+  const voices = window.speechSynthesis.getVoices();
+  const en = voices.find(v => v.lang.startsWith("en") && v.localService);
+  if (en) u.voice = en;
+  window.speechSynthesis.speak(u);
+}
+
+// ============================================================
+// アプリ状態
+// ============================================================
+let state = {
+  phrases: [],
+  current: 0,
+  flipped: false,
+  answered: false,
+  session: { ok: 0, ng: 0 },
+  filterMode: "due",
+  finished: false,
+};
+
+// ============================================================
+// 初期化
+// ============================================================
+async function init() {
+  const ok = await loadPhrases();
+  if (!ok || ALL_PHRASES.length === 0) {
+    document.getElementById("root").innerHTML = `
+      <div class="main">
+        <div class="error-screen">
+          <div class="error-icon">⚠️</div>
+          <div class="error-msg">フレーズデータを読み込めませんでした。<br>ネットワーク接続を確認してください。</div>
+          <button class="btn-retry" onclick="init()">🔄 再試行</button>
+        </div>
+      </div>`;
+    return;
+  }
+  startSession("due");
+}
+
+function startSession(filterMode, reviewList) {
+  state.filterMode = filterMode;
+  state.phrases = reviewList || getDueCards(ALL_PHRASES, filterMode);
+  if (state.phrases.length === 0 && filterMode === "due") {
+    state.phrases = getDueCards(ALL_PHRASES, "all");
+    state.filterMode = "all";
+  }
+  state.current = 0;
+  state.flipped = false;
+  state.answered = false;
+  state.session = { ok: 0, ng: 0 };
+  state.finished = false;
+  renderAll();
+}
+
+// ============================================================
+// レンダリング
+// ============================================================
+function renderAll() {
+  const root = document.getElementById("root");
+  if (state.finished) { renderFinish(root); return; }
+
+  const phrase = state.phrases[state.current];
+  const total = state.phrases.length;
+  const idx = state.current;
+  const pct = Math.round(((idx) / total) * 100);
+
+  const filters = [
+    { id: "due", label: "📅 今日の復習" },
+    { id: "all", label: "📚 全件" },
+    { id: "weak", label: "💪 苦手のみ" },
+  ];
+  const filterHtml = filters.map(f =>
+    `<button class="btn-filter${state.filterMode === f.id ? ' active' : ''}"
+      onclick="startSession('${f.id}')">${f.label}</button>`
+  ).join("");
+
+  const frontHtml = `
+    <div class="card-face" style="min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      ${phrase.situation ? `<div class="situation-badge">${phrase.situation}</div>` : ''}
+      <div class="card-ja">${phrase.japanese || ''}</div>
+      <div class="card-tap-hint">👆 タップして英語を確認</div>
+    </div>`;
+
+  const examplesHtml = (phrase.examples || []).slice(0, 6).map(ex => `
+    <div class="example-item">
+      <div class="example-text">${ex}</div>
+      <button class="btn-speak-sm" onclick="event.stopPropagation();speak('${ex.replace(/'/g,"\\'")}')" aria-label="読み上げ">🔊</button>
+    </div>`).join("");
+
+  const srs = loadSRS()[phrase.url];
+  const nextInfo = srs ? `次回: ${getNextDateLabel(phrase.url)} (間隔 ${srs.interval}日)` : "初回学習";
+
+  const backHtml = `
+    <div class="card-face card-back" style="min-height:180px;">
+      <div class="card-en-wrap">
+        <div class="card-en">${phrase.english || ''}</div>
+        <button class="btn-speak" onclick="event.stopPropagation();speak('${(phrase.english||'').replace(/'/g,"\\'")}')">🔊 読む</button>
+      </div>
+      ${phrase.meaning ? `<div class="meaning">${phrase.meaning}</div>` : ''}
+      ${examplesHtml ? `<div class="examples-title">例文</div>${examplesHtml}` : ''}
+      <div class="next-badge" id="next-badge-info" style="display:none;">${nextInfo}</div>
+    </div>`;
+
+  root.innerHTML = `
+    <div style="background:var(--bg);border-bottom:0.5px solid var(--border);">
+      <div class="progress-wrap" style="padding:10px 16px 10px;">
+        <div class="progress-info">
+          <span>${idx + 1} / ${total} 問</span>
+          <span>${pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="prog" style="width:${pct}%"></div></div>
+      </div>
+      <div style="padding:8px 12px 10px;">
+        <div class="filter-bar">${filterHtml}</div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="card-wrap" onclick="flipCard()">
+        <div class="card-inner${state.flipped ? ' flipped' : ''}" id="card-inner" style="min-height:220px;">
+          ${frontHtml}
+          ${backHtml}
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-answer btn-ng" id="btn-ng" onclick="answer(false)"
+          ${!state.flipped || state.answered ? 'disabled' : ''}>✗ もう一度</button>
+        <button class="btn-answer btn-ok" id="btn-ok" onclick="answer(true)"
+          ${!state.flipped || state.answered ? 'disabled' : ''}>✓ 覚えた！</button>
+      </div>
+      <div class="nav-row">
+        <button class="btn-nav" onclick="goCard(-1)" ${state.current === 0 ? 'disabled' : ''}>← 前へ</button>
+        <button class="btn-nav" id="btn-next" onclick="nextOrFinish()"
+          ${!state.answered ? 'disabled' : ''}>
+          ${state.current === total - 1 ? '結果を見る →' : '次へ →'}
+        </button>
+      </div>
+    </div>`;
+
+  document.getElementById("hdr-ok").textContent = "✓ " + state.session.ok;
+  document.getElementById("hdr-ng").textContent = "✗ " + state.session.ng;
+}
+
+function renderFinish(root) {
+  const total = state.phrases.length;
+  const pct = total > 0 ? Math.round((state.session.ok / total) * 100) : 0;
+  const emoji = pct >= 80 ? "🎉" : pct >= 50 ? "😊" : "📖";
+  const msg = pct >= 80 ? "素晴らしい！" : pct >= 50 ? "いい調子です！" : "コツコツ続けよう！";
+  const ngPhrases = state.phrases.filter(p => {
+    const srs = loadSRS()[p.url];
+    return srs && srs.lapses > 0 && srs.interval === 1;
+  });
+
+  root.innerHTML = `
+    <div class="main">
+      <div class="finish-screen">
+        <div class="finish-icon">${emoji}</div>
+        <div class="finish-title">${msg}</div>
+        <div class="finish-pct">${pct}%</div>
+        <div class="finish-sub">正解 ${state.session.ok} / ${total} 問</div>
+        <div class="score-grid">
+          <div class="score-card">
+            <div class="score-num" style="color:var(--green)">${state.session.ok}</div>
+            <div class="score-label">覚えた</div>
+          </div>
+          <div class="score-card">
+            <div class="score-num" style="color:var(--red)">${state.session.ng}</div>
+            <div class="score-label">要復習</div>
+          </div>
+          <div class="score-card">
+            <div class="score-num">${pct}%</div>
+            <div class="score-label">正解率</div>
+          </div>
+        </div>
+        <button class="btn-restart" onclick="startSession('due')">🔄 もう一度（今日の復習）</button>
+        ${ngPhrases.length > 0 ?
+          `<button class="btn-review" onclick="startSession('weak')">💪 苦手問題だけ再挑戦 (${ngPhrases.length}問)</button>` : ''}
+      </div>
+    </div>`;
+  document.getElementById("hdr-ok").textContent = "✓ " + state.session.ok;
+  document.getElementById("hdr-ng").textContent = "✗ " + state.session.ng;
+}
+
+// ============================================================
+// インタラクション
+// ============================================================
+function flipCard() {
+  if (state.answered) return;
+  state.flipped = !state.flipped;
+  const inner = document.getElementById("card-inner");
+  if (inner) inner.classList.toggle("flipped", state.flipped);
+  const btns = document.querySelectorAll(".btn-answer");
+  btns.forEach(b => b.disabled = !state.flipped);
+  if (state.flipped) {
+    const phrase = state.phrases[state.current];
+    if (phrase && phrase.english) setTimeout(() => speak(phrase.english), 300);
+    const badge = document.getElementById("next-badge-info");
+    if (badge) badge.style.display = "block";
+  }
+}
+
+function answer(correct) {
+  if (state.answered || !state.flipped) return;
+  state.answered = true;
+  const phrase = state.phrases[state.current];
+  updateSRS(phrase.url, correct);
+  if (correct) state.session.ok++;
+  else state.session.ng++;
+
+  document.getElementById("hdr-ok").textContent = "✓ " + state.session.ok;
+  document.getElementById("hdr-ng").textContent = "✗ " + state.session.ng;
+
+  const btnOk = document.getElementById("btn-ok");
+  const btnNg = document.getElementById("btn-ng");
+  const btnNext = document.getElementById("btn-next");
+  if (btnOk) btnOk.disabled = true;
+  if (btnNg) btnNg.disabled = true;
+  if (btnNext) btnNext.disabled = false;
+
+  const badge = document.getElementById("next-badge-info");
+  if (badge) {
+    badge.textContent = correct
+      ? "✓ 次回: " + getNextDateLabel(phrase.url)
+      : "✗ 明日また復習";
+    badge.style.color = correct ? "var(--green)" : "var(--red)";
+  }
+}
+
+function nextOrFinish() {
+  if (!state.answered) return;
+  if (state.current === state.phrases.length - 1) {
+    state.finished = true;
+    renderAll();
+  } else {
+    state.current++;
+    state.flipped = false;
+    state.answered = false;
+    renderAll();
+  }
+}
+
+function goCard(dir) {
+  const next = state.current + dir;
+  if (next < 0 || next >= state.phrases.length) return;
+  state.current = next;
+  state.flipped = false;
+  state.answered = false;
+  renderAll();
+}
+
+// ============================================================
+// Service Worker登録（PWA）
+// ============================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/nic-flashcard/sw.js')
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// オフライン検知
+window.addEventListener('online', () => {
+  document.getElementById('offline-banner').style.display = 'none';
+});
+window.addEventListener('offline', () => {
+  document.getElementById('offline-banner').style.display = 'block';
+});
+
+// iOS音声初期化
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+}
+
+// 起動
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
