@@ -300,21 +300,15 @@ function render() {
     {id:"weak",label:"💪 苦手のみ"}
   ].map(f=>`<button class="btn-filter${S.filterMode===f.id?' active':''}" onclick="startSession('${f.id}')">${f.label}</button>`).join("");
 
-  // ボタン状態
-  // 解答ボタン：裏面表示中かつ未回答のときだけ有効
-  const canAnswer = S.flipped && !S.answered;
-  const canNext   = S.answered;
-  const canPrev   = S.current > 0;
-
   const btnAreaHtml=`
     <div class="btn-area">
       <div class="btn-row">
-        <button class="btn-answer btn-ng${canAnswer?'':' inactive'}" onclick="doAnswer(false)">✗ もう一度</button>
-        <button class="btn-answer btn-ok${canAnswer?'':' inactive'}" onclick="doAnswer(true)">✓ 覚えた！</button>
+        <button class="btn-answer btn-ng" onclick="doAnswer(false)">✗ もう一度</button>
+        <button class="btn-answer btn-ok" onclick="doAnswer(true)">✓ 覚えた！</button>
       </div>
       <div class="nav-row">
-        <button class="btn-nav${canPrev?'':' inactive'}" onclick="doPrev()">← 前へ</button>
-        <button class="btn-nav${canNext?'':' inactive'}" onclick="doNext()">
+        <button class="btn-nav" onclick="doPrev()">← 前へ</button>
+        <button class="btn-nav" onclick="doNext()">
           ${S.current===total-1?'結果を見る →':'次へ →'}
         </button>
       </div>
@@ -417,7 +411,6 @@ function doFlip() {
 }
 
 function doAnswer(ok) {
-  if(!S.flipped||S.answered) return;  // 裏面表示中でないと無効
   S.answered=true; S.lastOk=ok;
   updateSRS(S.phrases[S.current].url, ok);
   if(ok) S.ok++; else S.ng++;
@@ -425,7 +418,6 @@ function doAnswer(ok) {
 }
 
 function doNext() {
-  if(!S.answered) return;
   if(S.current===S.phrases.length-1) { S.finished=true; }
   else { S.current++; S.flipped=false; S.answered=false; S.lastOk=null; }
   render();
