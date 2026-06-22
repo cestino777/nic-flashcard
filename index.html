@@ -158,7 +158,7 @@
 <body>
 
 <div class="header">
-  <div class="header-title">📚 ニック式 フラッシュカード</div>
+  <div class="header-title">📚 ニック式 フラッシュカード <span style="font-size:10px;color:var(--text-hint)">v2</span></div>
   <div class="header-stats">
     <span class="stat-ok" id="hdr-ok">✓ 0</span>
     <span class="stat-ng" id="hdr-ng">✗ 0</span>
@@ -201,14 +201,38 @@ function saveSRS(s) { localStorage.setItem(SRS_KEY,JSON.stringify(s)); }
 function getDueCards(phrases, mode) {
   const srs=loadSRS(), today=todayStr();
   let pool=[...phrases];
-  if (mode==="due")  pool=pool.filter(p=>{const r=srs[p.url];return !r||r.next_date<=today;});
+
+  if (mode==="due") pool=pool.filter(p=>{const r=srs[p.url];return !r||r.next_date<=today;});
   if (mode==="weak") pool=pool.filter(p=>{const r=srs[p.url];return r&&r.lapses>0;});
-  pool.sort((a,b)=>{
-    const ra=srs[a.url],rb=srs[b.url];
-    if(!ra&&!rb)return 0; if(!ra)return -1; if(!rb)return 1;
-    return ra.next_date.localeCompare(rb.next_date);
+
+  // ── SRS優先度でグループ分け → グループ内シャッフル ──
+  // 1) 苦手（lapses多 & interval短）  → 最優先
+  // 2) 初回学習（SRSデータなし）      → 次に優先
+  // 3) 期限到来（next_date <= today）  → 通常復習
+  // 4) それ以外                       → 最後
+  const buckets = { weak:[], fresh:[], due:[], other:[] };
+  pool.forEach(p => {
+    const r = srs[p.url];
+    if (r && r.lapses >= 2 && r.interval <= 3) buckets.weak.push(p);
+    else if (!r) buckets.fresh.push(p);
+    else if (r.next_date <= today) buckets.due.push(p);
+    else buckets.other.push(p);
   });
-  return pool;
+
+  // 各グループ内をランダムシャッフル（Fisher-Yates）
+  [buckets.weak, buckets.fresh, buckets.due, buckets.other].forEach(shuffle);
+
+  // "all"モードでは初回学習を先頭へ、それ以外はdue優先
+  if (mode === "all") return [...buckets.fresh, ...buckets.weak, ...buckets.due, ...buckets.other];
+  return [...buckets.weak, ...buckets.due, ...buckets.fresh, ...buckets.other];
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 function updateSRS(url, ok) {
@@ -298,7 +322,8 @@ function render() {
     {id:"due",label:"📅 今日の復習"},
     {id:"all",label:"📚 全件"},
     {id:"weak",label:"💪 苦手のみ"}
-  ].map(f=>`<button class="btn-filter${S.filterMode===f.id?' active':''}" onclick="startSession('${f.id}')">${f.label}</button>`).join("");
+  ].map(f=>`<button class="btn-filter${S.filterMode===f.id?' active':''}" onclick="startSession('${f.id}')">${f.label}</button>`).join("")
+  + `<button class="btn-filter" onclick="startSession(S.filterMode)" title="シャッフル">🔀</button>`;
 
   const btnAreaHtml=`
     <div class="btn-area">
@@ -430,17 +455,21 @@ function doPrev() {
 }
 
 // ============================================================
-// PWA
+// PWA (V2: 旧キャッシュ強制更新)
 // ============================================================
+const APP_VERSION = "2.0";
 if('serviceWorker' in navigator) {
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/nic-flashcard/sw.js').catch(()=>{});
+  window.addEventListener('load', async ()=>{
+    // 既存SWを更新させる
+    const reg = await navigator.serviceWorker.register('/nic-flashcard/sw.js').catch(()=>null);
+    if(reg) reg.update().catch(()=>{});
   });
 }
 window.addEventListener('online',()=>{document.getElementById('offline-banner').style.display='none';});
 window.addEventListener('offline',()=>{document.getElementById('offline-banner').style.display='block';});
 if(window.speechSynthesis) window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
 window.addEventListener('DOMContentLoaded',init);
+console.log(`[nic-flashcard] V${APP_VERSION} loaded, shuffle=${typeof shuffle === 'function'}`);
 </script>
 </body>
 </html>
